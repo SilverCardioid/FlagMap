@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "flagmap"
+version = "0.0.1"
+dependencies = ["cairocffi", "CairoSVG", "numpy", "rdp", "shapely >= 1.6", "cairopath @ git+https://github.com/SilverCardioid/cairopath.git"]
+
+[tool.setuptools]
+packages = ["flagmap"]

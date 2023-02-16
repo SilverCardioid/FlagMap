@@ -5,14 +5,20 @@ A Python module for creating flag maps. This includes maps with flags filling th
 | --------- | ----------- |
 | ![](/examples/US_flagmap.png) | ![](/examples/US_flagmap_small.png) |
 
-## Requirements
+## Installation
+Requirements:
 * [cairocffi](https://github.com/Kozea/cairocffi) (needs a Cairo DLL; see [here](https://github.com/SilverCardioid/CairoSVG#requirements) for more information)
 * [cairopath](https://github.com/SilverCardioid/cairopath)
 * [CairoSVG](https://github.com/Kozea/CairoSVG)
 * [rdp](https://pypi.org/project/rdp/)
 * [shapely](https://pypi.org/project/Shapely/)
 
-A version of the [rectangle-overlap](https://github.com/mwkling/rectangle-overlap) repository is included in this library as the `separate` helper module.
+A version of the [rectangle-overlap](https://github.com/mwkling/rectangle-overlap) repository is included in this library as the helper module `flagmap.separate`.
+
+Installation using Pip (includes all requirements except the Cairo DLL):
+```
+pip install git+https://github.com/SilverCardioid/FlagMap.git
+```
 
 ## Usage
 A flag map requires flags in .svg or .png format, and a map in .svg format. Each region in the map should be a single path with an `id` attribute, which is used for matching flags with regions. Only the path coordinates are used when reading the map file; attributes such as styling and transforms are disregarded.
@@ -21,7 +27,7 @@ A flag map requires flags in .svg or .png format, and a map in .svg format. Each
 
 ### FlagMap class
 ```python
-map = FlagMap(mapPath:str, mapOptions:dict = {}, *, printProgress:bool = True):
+map = flagmap.FlagMap(mapPath:str, mapOptions:dict = {}, *, printProgress:bool = True):
 ```
 
 Possible map options:
@@ -66,7 +72,7 @@ Draw and export the flag map.
 
 ### Flag class
 ```python
-flag = Flag(id:str, filePath:str, flagOptions:dict = {}):
+flag = flagmap.Flag(id:str, filePath:str, flagOptions:dict = {}):
 ```
 Created internally by the map's `addFlags` methods.
 
@@ -81,7 +87,7 @@ Possible flag options (which, unless otherwise noted, default to the correspondi
 
 ### ImageMap class
 ```python
-im = ImageMap(mapPath:str, epsilon:Optional[float] = 5, relEpsilon:Optional[float] = 1/3, nameFunction:Optional[Callable] = None):
+im = flagmap.ImageMap(mapPath:str, epsilon:Optional[float] = 5, relEpsilon:Optional[float] = 1/3, nameFunction:Optional[Callable] = None):
 im.list(outputPath:str)
 ```
 Generate and export the wikicode for an [image map](https://www.mediawiki.org/wiki/Extension:ImageMap) based on an SVG map image.
@@ -91,9 +97,10 @@ Region borders are simplified with the [Ramer–Douglas–Peucker algorithm](htt
 `nameFunction` is an optional callable that should map a region ID (its input parameter) to the pagename to link the region to. If not provided, the IDs themselves are used as the link names.
 
 ## Known issues
-* When a flag image has a large intrinsic size and needs to be scaled down too much for the flag map, Cairo renders it pixelated, or not at all. A workaround is to edit such flags externally to reduce their dimensions. `helpers/resize_flags.py` is a utility module for this, which is used in the `download` example script.
+* When a flag image has a large intrinsic size and needs to be scaled down too much for the flag map, Cairo renders it pixelated, or not at all. A workaround is to edit such flags externally to reduce their dimensions. `flagmap.resize_flags` is a utility module for this, which is used in the example script `US_download.py`.
 
 ## Feature ideas & todos
+* SVG output
 * Display region names on the map
 * Carry over colours and other styling from the input map
 * A simple GUI to match flags with regions, and to customise flag placement

@@ -17,7 +17,7 @@ from shapely.geometry import Polygon
 import rdp
 
 import cairopath
-from helpers import separate
+from . import separate
 
 xmlns = '{http://www.w3.org/2000/svg}'
 

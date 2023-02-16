@@ -1,8 +1,8 @@
 """ Download and resize the US state flags """
 
 import sys
-sys.path.insert(0, '..')
-from helpers import download_flags, resize_flags
+#sys.path.insert(0, '..')
+from flagmap import download_flags, resize_flags
 
 # Dictionary mapping region codes (corresponding to IDs in the base map) to Commons filenames
 usFlags = {
