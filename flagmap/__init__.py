@@ -21,219 +21,222 @@ from . import separate
 
 xmlns = '{http://www.w3.org/2000/svg}'
 
+def _read_map(map_path:str) -> ty.Tuple[ET.Element, float, float]:
+	map_svg = ET.parse(map_path)
+	root = map_svg.getroot()
+	width = re.match('^(\d*\.?\d+(?:e\d+)?)(?:px)?$', root.attrib['width'])
+	height = re.match('^(\d*\.?\d+(?:e\d+)?)(?:px)?$', root.attrib['height'])
+	if not width or not height:
+		raise Exception(f'couldn\'t parse intrinsic size: {root.attrib["width"]} × {root.attrib["height"]}')
+	return (root, float(width[1]), float(height[1]))
+
 class FlagMap:
-	mapOptions = {
+	map_options = {
 		'height': None,
-		'backgroundColor': '#444',
-		'mapColor': '#ddd',
-		'strokeColor': '#aaa',
-		'strokeWidth': 1,
-		'flagOpacity': 1,
-		'preserveAspectRatio': True,
-		'smallFlag': False,
-		'smallFlagSize': None,
-		'smallFlagThreshold': None,
-		'smallFlagSeparate': True,
-		'smallFlagSpacing': None,
-		'lerpPOI': 0.5
+		'background_color': '#444',
+		'map_color': '#ddd',
+		'stroke_color': '#aaa',
+		'stroke_width': 1,
+		'flag_opacity': 1,
+		'preserve_aspect_ratio': True,
+		'small_flag': False,
+		'small_flag_size': None,
+		'small_flag_threshold': None,
+		'small_flag_separate': True,
+		'small_flag_spacing': None,
+		'small_flag_position_lerp': 0.5
 	}
 
-	def __init__(self, mapPath:str, mapOptions:dict = {}, *, printProgress:bool = True):
-		self.mapPath = mapPath
-		self.printProgress = printProgress
+	def __init__(self, map_path:str, options:dict = {}, *, print_progress:bool = True):
+		self.map_path = map_path
+		self.print_progress = print_progress
 		self.flags = {}
-		self.smallFlags = {}
-		self.mapOptions = {key: mapOptions.get(key, val) for key,val in FlagMap.mapOptions.items()}
-		if self.printProgress:
-			for key in mapOptions.keys():
-				if key not in FlagMap.mapOptions:
-					print('Warning: unknown mapOption ' + key)
+		self.small_flags = {}
+		self.map_options = {key: options.get(key, val) for key,val in FlagMap.map_options.items()}
+		if self.print_progress:
+			for key in options.keys():
+				if key not in FlagMap.map_options:
+					print('Warning: unknown map option ' + key)
 
-		if self.printProgress:
-			print('Reading ' + os.path.basename(mapPath))
-		mapSVG = ET.parse(mapPath)
-		self.map = mapSVG.getroot()
-		width = re.match('^(\d*\.?\d+(?:e\d+)?)(?:px)?$', self.map.attrib['width'])
-		height = re.match('^(\d*\.?\d+(?:e\d+)?)(?:px)?$', self.map.attrib['height'])
-		if not width or not height:
-			raise Exception(f'couldn\'t parse intrinsic size: {self.map.attrib["width"]} × {self.map.attrib["height"]}')
-		self.intrinsicWidth = float(width[1])
-		self.intrinsicHeight = float(height[1])
+		if self.print_progress:
+			print('Reading ' + os.path.basename(map_path))
+		map_svg = ET.parse(map_path)
+		self.map, self.map_width, self.map_height = _read_map(map_path)
 
-		if self.mapOptions['height'] is None:
-			self.mapOptions['height'] = self.intrinsicHeight
-		if self.mapOptions['smallFlagSize'] is None:
-			self.mapOptions['smallFlagSize'] = self.mapOptions['height']/40
-		if self.mapOptions['smallFlagSpacing'] is None:
-			self.mapOptions['smallFlagSpacing'] = self.mapOptions['smallFlagSize']/5
+		if self.map_options['height'] is None:
+			self.map_options['height'] = self.map_height
+		if self.map_options['small_flag_size'] is None:
+			self.map_options['small_flag_size'] = self.map_options['height']/40
+		if self.map_options['small_flag_spacing'] is None:
+			self.map_options['small_flag_spacing'] = self.map_options['small_flag_size']/5
 
-	def draw(self, outputPath:str):
-		scale = self.mapOptions['height']/self.intrinsicHeight
-		mapWidth = round(scale*self.intrinsicWidth)
-		mapHeight = round(scale*self.intrinsicHeight)
-		canvas = cairopath.Canvas(mapWidth, mapHeight, self.mapOptions['backgroundColor'])
+	def draw(self, output_path:str):
+		scale = self.map_options['height']/self.map_height
+		width = round(scale*self.map_width)
+		height = round(scale*self.map_height)
+		canvas = cairopath.Canvas(width, height, self.map_options['background_color'])
 		canvas.scale(scale)
 
 		try:
-			smallFlagsToDraw = []
+			small_flags_to_draw = []
 			for child in self.map.iter(xmlns + 'path'):
 				id = child.attrib['id'] if 'id' in child.attrib else None
-				border = Border(id, child.attrib['d'], _printProgress=self.printProgress)
+				border = Border(id, child.attrib['d'], _print_progress=self.print_progress)
 				border.parse(canvas) # draws the border for the following fill/stroke calls
 				if id and id in self.flags:
 					flag = self.flags[id]
 
-					makeSmall = flag.flagOptions['smallFlag'] or \
-					            (id not in self.smallFlags and self.mapOptions['smallFlagThreshold'] and
-					             border.width*border.height < self.mapOptions['smallFlagThreshold']**2)
-					if makeSmall:
-						canvas.fill(self.mapOptions['mapColor'], keep=True) \
-						      .stroke(self.mapOptions['strokeColor'], width=self.mapOptions['strokeWidth']/scale)
-						centerX, centerY = border.getCenter(self.mapOptions['lerpPOI'])
-						smallFlagsToDraw.append({'flag': flag, 'x': centerX, 'y': centerY})
-						if id in self.smallFlags: # flagOptions['smallFlag'] overrides self.smallFlags
+					make_small = flag.flag_options['small_flag'] or \
+					             (id not in self.small_flags and self.map_options['small_flag_threshold'] and
+					              border.width*border.height < self.map_options['small_flag_threshold']**2)
+					if make_small:
+						canvas.fill(self.map_options['map_color'], keep=True) \
+						      .stroke(self.map_options['stroke_color'], width=self.map_options['stroke_width']/scale)
+						center_x, center_y = border.get_center(self.map_options['small_flag_position_lerp'])
+						small_flags_to_draw.append({'flag': flag, 'x': center_x, 'y': center_y})
+						if id in self.small_flags: # flag_options['small_flag'] overrides self.small_flags
 							continue
 					else:
 						flag.read()
-						scaleX, scaleY = border.width/flag.width, border.height/flag.height
-						x, y = border.minX, border.minY
-						if self.mapOptions['preserveAspectRatio'] and scaleX != scaleY:
-							if scaleX > scaleY:
-								scaleY = scaleX
-								y -= (scaleY*flag.height - border.height)*flag.flagOptions['keyPoint'][1]
+						scale_x, scale_y = border.width/flag.width, border.height/flag.height
+						x, y = border.min_x, border.min_y
+						if self.map_options['preserve_aspect_ratio'] and scale_x != scale_y:
+							if scale_x > scale_y:
+								scaley = scale_x
+								y -= (scale_y*flag.height - border.height)*flag.flag_options['key_point'][1]
 							else:
-								scaleX = scaleY
-								x -= (scaleX*flag.width - border.width)*flag.flagOptions['keyPoint'][0]
+								scale_x = scale_y
+								x -= (scale_x*flag.width - border.width)*flag.flag_options['key_point'][0]
 						with canvas.clip(): # uses last drawing (border)
-							flag.draw(canvas, x, y, scaleX, scaleY, small=False)
+							flag.draw(canvas, x, y, scale_x, scale_y, small=False)
 						border.draw(canvas)
-						canvas.stroke(self.mapOptions['strokeColor'], width=self.mapOptions['strokeWidth']/scale)
+						canvas.stroke(self.map_options['stroke_color'], width=self.map_options['stroke_width']/scale)
 
-				elif id: # no flag, or flag from self.smallFlags
-					canvas.fill(self.mapOptions['mapColor'], keep=True) \
-					      .stroke(self.mapOptions['strokeColor'], width=self.mapOptions['strokeWidth']/scale)
+				elif id: # no flag, or flag from self.small_flags
+					canvas.fill(self.map_options['map_color'], keep=True) \
+					      .stroke(self.map_options['stroke_color'], width=self.map_options['stroke_width']/scale)
 				else: # no id; just draw stroke
-					canvas.stroke(self.mapOptions['strokeColor'], width=self.mapOptions['strokeWidth']/scale)
+					canvas.stroke(self.map_options['stroke_color'], width=self.map_options['stroke_width']/scale)
 
-				if id in self.smallFlags:
-					centerX, centerY = border.getCenter(self.mapOptions['lerpPOI'])
-					smallFlagsToDraw.append({'flag': self.smallFlags[id], 'x': centerX, 'y': centerY})
+				if id in self.small_flags:
+					center_x, center_y = border.get_center(self.map_options['small_flag_position_lerp'])
+					small_flags_to_draw.append({'flag': self.small_flags[id], 'x': center_x, 'y': center_y})
 
 
-			if len(smallFlagsToDraw) > 0:
-				if self.mapOptions['smallFlagSeparate']:
+			if len(small_flags_to_draw) > 0:
+				if self.map_options['small_flag_separate']:
 					rects = []
-					sep = self.mapOptions['smallFlagSpacing']
-					for arr in smallFlagsToDraw:
+					sep = self.map_options['small_flag_spacing']
+					for arr in small_flags_to_draw:
 						flag = arr['flag']
 						flag.read()
-						flag.scale = flag.flagOptions['smallFlagSize']/math.sqrt(flag.width*flag.height)
+						flag.scale = flag.flag_options['small_flag_size']/math.sqrt(flag.width*flag.height)
 						arr['width'], arr['height'] = flag.scale*flag.width, flag.scale*flag.height
 						rw, rh = arr['width'] + sep, arr['height'] + sep
 						rx, ry = arr['x'] - rw/2, arr['y'] - rh/2
 						rects.append(separate.Rectangle(rx, ry, rw, rh))
 
-					if self.printProgress:
+					if self.print_progress:
 						print('Separating')
 					stepper = separate.Separation(rects)
 					while separate.Rectangle.has_overlaps(stepper.rectangles):
 						stepper.step()
-					if self.printProgress:
+					if self.print_progress:
 						movement = separate.Rectangle.total_movement(stepper.rectangles)
 						print(f'Total movement: {movement:g} px')
 
-					for i, arr in enumerate(smallFlagsToDraw):
+					for i, arr in enumerate(small_flags_to_draw):
 						flag = arr['flag']
-						if self.printProgress and len(smallFlagsToDraw) > 0:
-							print('Drawing ' + os.path.basename(flag.filePath))
+						if self.print_progress and len(small_flags_to_draw) > 0:
+							print('Drawing ' + os.path.basename(flag.file_path))
 						flag.draw(canvas, rects[i].midx - arr['width']/2, rects[i].midy - arr['height']/2,
 						          flag.scale, small=True)
 
 				else:
-					for arr in smallFlagsToDraw:
+					for arr in small_flags_to_draw:
 						flag = arr['flag']
 						flag.read()
-						flag.scale = flag.flagOptions['smallFlagSize']/math.sqrt(flag.width*flag.height)
+						flag.scale = flag.flag_options['small_flag_size']/math.sqrt(flag.width*flag.height)
 						x, y = arr['x'] - flag.scale*flag.width/2, arr['y'] - flag.scale*flag.height/2
 						flag.draw(canvas, x, y, flag.scale, small=True)
 
 		finally:
-			canvas.export('png', outputPath)
+			canvas.export('png', output_path)
 
-	def addFlags(self, flags:ty.Dict[str, str], flagOptions:dict = {}, *,
+	def add_flags(self, flags:ty.Dict[str, str], flag_options:dict = {}, *,
 	             small:bool = False, overwrite:bool = True):
-		target = self.smallFlags if small else self.flags
+		target = self.small_flags if small else self.flags
 		for id in flags:
 			if id in target:
-				if self.printProgress:
+				if self.print_progress:
 					print('Flag for ' + id + ('' if overwrite else ' not') + ' overwritten')
 				if not overwrite: continue
-			target[id] = Flag(id, flags[id], flagOptions, _mapOptions=self.mapOptions, _printProgress=self.printProgress)
+			target[id] = Flag(id, flags[id], flag_options, _map_options=self.map_options, _print_progress=self.print_progress)
 
 		return self
 
-	def addFlagsFromFolder(self, folder:str, flagOptions:dict = {}, *,
-	                       small:bool = False, overwrite:bool = False, recursive:bool = False):
+	def add_folder(self, folder:str, flag_options:dict = {}, *,
+	               small:bool = False, overwrite:bool = False, recursive:bool = False):
 		wildcard = '**/*' if recursive else '*'
 		svgs = glob.glob(os.path.join(folder, wildcard + '.svg'))
 		pngs = glob.glob(os.path.join(folder, wildcard + '.png'))
-		target = self.smallFlags if small else self.flags
+		target = self.small_flags if small else self.flags
 		for file in svgs + pngs:
 			id = os.path.splitext(os.path.basename(file))[0]
 			if id in target:
-				if file[-4:].lower() == '.png' and target[id].fileType == '.svg':
+				if file[-4:].lower() == '.png' and target[id].file_type == '.svg':
 					# Silently skip PNG if SVG exists
 					continue
-				elif self.printProgress:
+				elif self.print_progress:
 					print('Flag for ' + id + ('' if overwrite else ' not') + ' overwritten')
 				if not overwrite: continue
-			target[id] = Flag(id, file, flagOptions, _mapOptions=self.mapOptions, _printProgress=self.printProgress)
+			target[id] = Flag(id, file, flag_options, _map_options=self.map_options, _print_progress=self.print_progress)
 		return self
 
 
 class Flag:
-	flagOptions = {
-		'strokeColor': None,
-		'strokeWidth': None,
-		'smallFlag': None,
-		'smallFlagSize': None,
-		'flagOpacity': None,
-		'keyPoint': (0.5, 0.5),
+	flag_options = {
+		'stroke_color': None,
+		'stroke_width': None,
+		'small_flag': None,
+		'small_flag_size': None,
+		'flag_opacity': None,
+		'key_point': (0.5, 0.5),
 		'outline': [(0,0), (1,0), (1,1), (0,1)]
 	}
 
-	def __init__(self, id:str, filePath:str, flagOptions:dict = {}, *, _mapOptions={}, _printProgress=True):
-		self.printProgress = _printProgress
+	def __init__(self, id:str, file_path:str, options:dict = {}, *, _map_options={}, _print_progress=True):
+		self.print_progress = _print_progress
 		self.id = id
-		self.filePath = filePath
-		self.fileType = os.path.splitext(self.filePath)[1].lower()
-		if not os.path.exists(filePath):
-			raise FileNotFoundError(filePath)
+		self.file_path = file_path
+		self.file_type = os.path.splitext(self.file_path)[1].lower()
+		if not os.path.exists(self.file_path):
+			raise FileNotFoundError(self.file_path)
 		self.surface = None
 		self.ratio = 1
-		self.flagOptions = {key: flagOptions.get(key, val) for key,val in Flag.flagOptions.items()}
-		for key in self.flagOptions:
-			if self.flagOptions[key] is None and key in _mapOptions:
-				self.flagOptions[key] = _mapOptions[key]
-		if self.printProgress:
-			for key in flagOptions.keys():
-				if key not in Flag.mapOptions:
-					print('Warning: unknown mapOption ' + key)
+		self.flag_options = {key: options.get(key, val) for key,val in Flag.flag_options.items()}
+		for key in self.flag_options:
+			if self.flag_options[key] is None and key in _map_options:
+				self.flag_options[key] = _map_options[key]
+		if self.print_progress:
+			for key in options.keys():
+				if key not in Flag.map_options:
+					print('Warning: unknown map option ' + key)
 
 	def read(self):
 		if self.surface is None:
-			if self.printProgress:
-				print('Reading ' + os.path.basename(self.filePath))
-			if self.fileType == '.svg':
-				tree = csvg_Tree(url=self.filePath)
+			if self.print_progress:
+				print('Reading ' + os.path.basename(self.file_path))
+			if self.file_type == '.svg':
+				tree = csvg_Tree(url=self.file_path)
 				surface = csvg_Surface(tree, output=None, dpi=96)
 				self.width, self.height = surface.width, surface.height
 				self.surface = surface.cairo
-			elif self.fileType == '.png':
-				self.surface = cairo.ImageSurface.create_from_png(self.filePath)
+			elif self.file_type == '.png':
+				self.surface = cairo.ImageSurface.create_from_png(self.file_path)
 				self.width, self.height = self.surface.get_width(), self.surface.get_height()
 			else:
-				raise Exception('unsupported flag file type: ' + self.fileType)
+				raise Exception('unsupported flag file type: ' + self.file_type)
 		return self
 
 	def draw(self, canvas:cairopath.Canvas, x:float = 0, y:float = 0,
@@ -242,21 +245,21 @@ class Flag:
 			self.read()
 		if not sy:
 			sy = sx
-		if small and self.flagOptions['outline'] and self.flagOptions['strokeWidth'] > 0:
+		if small and self.flag_options['outline'] and self.flag_options['stroke_width'] > 0:
 			w, h = self.width*sx, self.height*sy
-			outline = self.flagOptions['outline']
+			outline = self.flag_options['outline']
 			path = canvas.path()
 			path.M(x + w*outline[0][0], y + h*outline[0][1])
 			for coord in outline[1:]:
 				path.L(x + w*coord[0], y + h*coord[1])
-			path.z().stroke(self.flagOptions['strokeColor'], width=2*self.flagOptions['strokeWidth'])
+			path.z().stroke(self.flag_options['stroke_color'], width=2*self.flag_options['stroke_width'])
 
 		with canvas.translate(x, y).scale(sx, sy):
 			if not small:
 				canvas.rect(self.width, self.height).fill('#fff')
 			canvas.context.set_source_surface(self.surface, 0, 0)
-			if not small and self.flagOptions['flagOpacity'] < 1:
-				canvas.context.paint_with_alpha(self.flagOptions['flagOpacity'])
+			if not small and self.flag_options['flag_opacity'] < 1:
+				canvas.context.paint_with_alpha(self.flag_options['flag_opacity'])
 			else:
 				canvas.context.paint()
 
@@ -264,8 +267,8 @@ class Flag:
 
 
 class Border:
-	def __init__(self, id:str, d:str, *, _printProgress=True):
-		self.printProgress = _printProgress
+	def __init__(self, id:str, d:str, *, _print_progress=True):
+		self.print_progress = _print_progress
 		self.id = id
 		self.d = d
 		self.vertices = None
@@ -279,20 +282,20 @@ class Border:
 		self.draw(canvas)
 
 		# vertices = [(x,y), (angle,angle), (x,y), ...]
-		self.minX = self.maxX = self.vertices[0][0]
-		self.minY = self.maxY = self.vertices[0][1]
-		vGen = (v for i,v in enumerate(self.vertices) if i%2 == 0)
-		for v in vGen:
+		self.min_x = self.max_x = self.vertices[0][0]
+		self.min_y = self.max_y = self.vertices[0][1]
+		v_gen = (v for i,v in enumerate(self.vertices) if i%2 == 0)
+		for v in v_gen:
 			if v is not None:
-				self.minX = min(self.minX, v[0]); self.maxX = max(self.maxX, v[0])
-				self.minY = min(self.minY, v[1]); self.maxY = max(self.maxY, v[1])
-		self.width = self.maxX - self.minX
-		self.height = self.maxY - self.minY
+				self.min_x = min(self.min_x, v[0]); self.max_x = max(self.max_x, v[0])
+				self.min_y = min(self.min_y, v[1]); self.max_y = max(self.max_y, v[1])
+		self.width = self.max_x - self.min_x
+		self.height = self.max_y - self.min_y
 
-	def getCenter(self, lerpPOI:float = 0):
-		centerX, centerY = (self.minX + self.maxX)/2, (self.minY + self.maxY)/2
+	def get_center(self, small_flag_position_lerp:float = 0):
+		center_x, center_y = (self.min_x + self.max_x)/2, (self.min_y + self.max_y)/2
 
-		if lerpPOI > 0:
+		if small_flag_position_lerp > 0:
 			try:
 				polys = [[]]
 				for i, v in enumerate(self.vertices):
@@ -300,43 +303,43 @@ class Border:
 						polys[-1].append(v)
 					elif v is None:
 						polys.append([])
-				bestPoint = None
-				bestRadius = 0
+				best_point = None
+				best_radius = 0
 				for poly in polys:
 					if len(poly) >= 3:
-						polyObj = Polygon(poly)
-						point = polylabel(polyObj)
-						radius = point.distance(polyObj.exterior)
-						if radius > bestRadius:
-							bestPoint = point
-							bestRadius = radius
-				centerX = lerpPOI*bestPoint.x + (1 - lerpPOI)*centerX
-				centerY = lerpPOI*bestPoint.y + (1 - lerpPOI)*centerY
+						poly_obj = Polygon(poly)
+						point = polylabel(poly_obj)
+						radius = point.distance(poly_obj.exterior)
+						if radius > best_radius:
+							best_point = point
+							best_radius = radius
+				center_x = small_flag_position_lerp*best_point.x + (1 - small_flag_position_lerp)*center_x
+				center_y = small_flag_position_lerp*best_point.y + (1 - small_flag_position_lerp)*center_y
 			except:
 				print(f'Error getting POI for outline of {self.id}:')
 				traceback.print_exc()
 
-		return (centerX, centerY)
+		return (center_x, center_y)
 
 
 class ImageMap:
-	def __init__(self, mapPath:str, epsilon:float = 5, relEpsilon:float = 1/3,
-	             nameFunction:ty.Optional[ty.Callable] = None):
-		self.mapPath = mapPath
+	def __init__(self, map_path:str, epsilon:float = 5, rel_epsilon:float = 1/3,
+	             name_function:ty.Optional[ty.Callable[[str],str]] = None):
+		self.map_path = map_path
 		self.epsilon = epsilon
-		self.relEpsilon = relEpsilon
-		self.nameFunction = nameFunction
-		self._flagmap = FlagMap(mapPath, printProgress=False)
-		self._canvas = cairopath.Canvas(round(self._flagmap.intrinsicWidth), round(self._flagmap.intrinsicHeight))
+		self.rel_epsilon = rel_epsilon
+		self.name_function = name_function
+		self.map, self.map_width, self.map_height = _read_map(map_path)
+		self._canvas = cairopath.Canvas(round(self.map_width), round(self.map_height))
 
-	def list(self, outputPath:str):
-		with open(outputPath, 'w', encoding='UTF-8') as f:
+	def list(self, output_path:str):
+		with open(output_path, 'w', encoding='UTF-8') as f:
 			f.write('<imagemap>\n')
-			f.write('File:{}|{}px|thumb|right\n'.format(os.path.basename(self.mapPath), round(self._flagmap.intrinsicHeight)))
-			for child in self._flagmap.map.iter(xmlns + 'path'):
+			f.write('File:{}|{}px|thumb|right\n'.format(os.path.basename(self.map_path), round(self.map_height)))
+			for child in self.map.iter(xmlns + 'path'):
 				id = child.attrib['id'] if 'id' in child.attrib else None
 				if id:
-					name = self.nameFunction(id) if self.nameFunction else id
+					name = self.name_function(id) if self.name_function else id
 					border = Border(id, child.attrib['d'])
 					self._canvas.context.new_path() # reset current point
 					border.parse(self._canvas)
@@ -353,15 +356,15 @@ class ImageMap:
 
 	def poly(self, file:ty.TextIO, poly:ty.List[ty.Tuple[float, float]], link:str):
 		epsilon = self.epsilon or math.inf
-		if (self.epsilon or self.relEpsilon) and len(poly) > 2:
+		if (self.epsilon or self.rel_epsilon) and len(poly) > 2:
 			# Simplify using RDP
-			if self.relEpsilon:
+			if self.rel_epsilon:
 				# Limit epsilon to fraction of polygon width and height
-				(minX, minY), (maxX, maxY) = poly[0], poly[0]
+				(min_x, min_y), (max_x, max_y) = poly[0], poly[0]
 				for p in poly:
-					minX, minY = min(minX, p[0]), min(minY, p[1])
-					maxX, maxY = max(maxX, p[0]), max(maxY, p[1])
-				epsilon = max(1, min([self.epsilon, (maxX-minX)*self.relEpsilon, (maxY-minY)*self.relEpsilon]))
+					min_x, min_y = min(min_x, p[0]), min(min_y, p[1])
+					max_x, max_y = max(max_x, p[0]), max(max_y, p[1])
+				epsilon = max(1, min([self.epsilon, (max_x-min_x)*self.rel_epsilon, (max_y-min_y)*self.rel_epsilon]))
 			# Use closed version of path
 			poly = poly + [poly[0]]
 			poly = rdp.rdp(poly, epsilon=epsilon)
