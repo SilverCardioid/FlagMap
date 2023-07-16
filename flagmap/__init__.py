@@ -171,8 +171,9 @@ class FlagMap:
 
 		finally:
 			if surface_type == 'png':
-				# other surface types are saved automatically by Cairo
 				canvas.export(surface_type, output_path)
+			else:
+				canvas.surface.finish()
 
 	def add_flags(self, flags:ty.Dict[str, str], flag_options:dict = {}, *,
 	             small:bool = False, overwrite:bool = True):
