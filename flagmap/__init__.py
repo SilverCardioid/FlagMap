@@ -74,7 +74,16 @@ class FlagMap:
 		scale = self.map_options['height']/self.map_height
 		width = round(scale*self.map_width)
 		height = round(scale*self.map_height)
-		canvas = cairopath.Canvas(width, height, self.map_options['background_color'])
+
+		ext = os.path.splitext(output_path)[1].lower()
+		if ext not in ('.png', '.svg', '.pdf', '.ps'):
+			raise ValueError('unsupported output format: ' + ext)
+
+		surface_type = ext[1:]
+		canvas = cairopath.Canvas(
+			width, height, bgcolor=self.map_options['background_color'],
+			surfacetype=surface_type, filename=output_path
+		)
 		canvas.scale(scale)
 
 		try:
@@ -161,7 +170,9 @@ class FlagMap:
 						flag.draw(canvas, x, y, flag.scale, small=True)
 
 		finally:
-			canvas.export('png', output_path)
+			if surface_type == 'png':
+				# other surface types are saved automatically by Cairo
+				canvas.export(surface_type, output_path)
 
 	def add_flags(self, flags:ty.Dict[str, str], flag_options:dict = {}, *,
 	             small:bool = False, overwrite:bool = True):

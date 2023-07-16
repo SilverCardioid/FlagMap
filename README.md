@@ -23,6 +23,18 @@ pip install git+https://github.com/SilverCardioid/FlagMap.git
 ## Usage
 A flag map requires flags in .svg or .png format, and a map in .svg format. Each region in the map should be a single path with an `id` attribute, which is used for matching flags with regions. Only the path coordinates are used when reading the map file; attributes such as styling and transforms are disregarded.
 
+Output file formats are those supported by Cairo: .png, .svg, .pdf and .ps (the latter two untested).
+
+Basic usage example:
+```python
+map = flagmap.FlagMap('map.svg', options={'height':600})
+map.add_flags({
+  'id1': 'flag1.svg',
+  'id2': 'flag2.png'
+})
+map.draw('flagmap.png')
+```
+
 ## Reference
 
 ### FlagMap class
@@ -100,7 +112,7 @@ Region borders are simplified with the [Ramer–Douglas–Peucker algorithm](htt
 * When a flag image has a large intrinsic size and needs to be scaled down too much for the flag map, Cairo renders it pixelated, or not at all. A workaround is to edit such flags externally to reduce their dimensions. `flagmap.resize_flags` is a utility module for this, which is used in the example script `US_download.py`.
 
 ## Feature ideas & todos
-* SVG output
+* Non-Cairo SVG output
 * Display region names on the map
 * Carry over colours and other styling from the input map
 * A simple GUI to match flags with regions, and to customise flag placement
